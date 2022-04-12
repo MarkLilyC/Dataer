@@ -381,3 +381,4 @@ if __name__ == '__main__':
     print(a)
 
 
+#   列表传输，lista = listb 
