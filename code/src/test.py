@@ -1,40 +1,21 @@
 import copy
+from traceback import print_tb
+import numpy as np
 
-class inner():
-    def __init__(self, key:int, value:int) -> None:
-        self.__key = key
-        self.__value = value
+
+class slice():
+    def __init__(self, var:list) -> None:
+        var_ = np.array(var)
+        self.__var = np.mean(var_)
+        del var_
     @property
-    def value(self):
-        return self.__value
+    def var(self):
+        return self.__var
 
-class outter():
-    __inners = {}
-    def __init__(self, inner_list:dict) -> None:
-        for key, value in inner_list.items():
-            self.__inners[key] = inner(key, value)
-    @property
-    def inners(self):
-        return self.__inners
-    
-inner1 = {
-    1:12,
-    2:13,
-    3:14,
-}
-inner2 = {
-    4:22,
-    5:24,
-    6:25
-}
-out = [inner1, inner2]
-outters = []
-for i in out:
-    outters.append(outter(i))
-
-print(outters[0].value)
-print(outters[1].value)
-
-
-
-
+a = slice([1,2,3,4,5,6,7])
+print(a.var)
+b = None
+if b:
+    print(1)
+else:
+    print

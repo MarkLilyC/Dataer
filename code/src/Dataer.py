@@ -52,29 +52,64 @@ def log(str_in_ = None, color = 1):
                 out_ = '·' + left_filler +  str_in_ + '·' + left_filler
                 print(LOGCOLOR[color] + out_ + '\033[0m')
 
-def dump_yml(path_:str, content_:dict):
-    with open(path_, 'w', encoding='utf-8') as f:
-        yaml.dump(content_, f)
+def dump_yml(path_:str, content_:dict) -> None:
+    '''将数据写入yaml文件中
 
-def expand(length_:int, item_):
-    res_ = []
-    for i in range(length_):
-        res_.append(item_)
-    return res_
-
-def judge_lr(positions_:list, casemode_ = None):
-    count_of_left = 0
-    for i in positions_:
-        if i[0] < 0:
-            count_of_left += 1
-    if casemode_ == 1:
-        return {'Unknown':count_of_left, 'Known': len(positions_) - count_of_left}
-    elif casemode_ == 2:
-        return {'Known':count_of_left, 'Unknown': len(positions_) - count_of_left}
+    Args:
+        path_ (str): 写入的文件路径
+        content_ (dict): _description_
+    '''
+    if os.path.exists(path=path_):
+        log('File Already Exists, Recommand Not to Overwrite', 0)
     else:
-        return {'Left':count_of_left, 'Right': len(positions_) - count_of_left}
+        with open(path_, 'w', encoding='utf-8') as f:
+            yaml.dump(content_, f)
 
-def cut_str_list_2_num_list(str_:str, cut_flag_ = ',') -> Type[list]: 
+def expand(length_:int, item_) -> list:
+    '''将item元素扩写为一个指定长度的list 主要用于生成数据分析时需要的index数据列
+
+    Args:
+        length_ (int): 需要扩写到的长度
+        item_ (_type_): 需要扩写的元素
+
+    Returns:
+        list: 扩写完成的list
+    '''
+    if length_ <= 0:
+        log('Length Must be a Positive Integer', 0)
+        return None
+    else:
+        res_ = []
+        for i in range(length_):
+            res_.append(item_)
+        return res_
+
+def judge_lr(positions_:list, casemode_ = 0) -> dict:
+    '''输入一个坐标数组(x,y)判断其中每组坐标位于中轴线的左侧还是右侧
+
+    Args:
+        positions_ (list): 输入的坐标数据:[[x,y],[x,y]..[x,y]],每组坐标为(x,y)
+        casemode_ (int, optional): 最终返回的dict中的keys. Defaults to 0.
+
+    Returns:
+        dict: 最终返回的坐标左右判断结果
+    '''
+    count_of_left_ = 0
+    for i in positions_:
+        if len(i) == 2:
+            if i[0] < 0:
+                count_of_left_ += 1
+        else:
+            log('Wrong Position Data:' + str(i), 0)
+            return None
+    if casemode_ == 1:
+        return {'Unknown':count_of_left_, 'Known': len(positions_) - count_of_left_}
+    elif casemode_ == 2:
+        return {'Known':count_of_left_, 'Unknown': len(positions_) - count_of_left_}
+    else:
+        return {'Left':count_of_left_, 'Right': len(positions_) - count_of_left_}
+
+def cut_str_list_2_num_list(str_:str, cut_flag_ = ',') -> list: 
         '''将以str形式呈现的列表切割并转换为float形式返回
 
         Args:
@@ -85,28 +120,48 @@ def cut_str_list_2_num_list(str_:str, cut_flag_ = ',') -> Type[list]:
             TypeError: 有无法转换类型的元素
 
         Returns:
-            _type_ (list): 以列表形式返回的列表 元素类型为float [1.f,2.f...7.f] 
+            list: 以列表形式返回的列表 元素类型为float [1.f,2.f...7.f]
+            None, : 字符串切割后生成列表失败
         '''
         str_ = str_.replace('[', '')
         str_ = str_.replace(' ', '')
         str_ = str_.replace(']', '')
         list_ = str_.split(',')
-        try:list_1 = list(map(float, list_))
-        except:
-            return None
-            '''print(list_)
-            raise TypeError('invaild value in the str_')
-'''
-        else:return list_1
+        if len(list_) == 0: #   当除去列表边界元素后,split该str的结果为空列表
+            log('Empty List',2)
+            return []
+        else:
+            try:list_1 = list(map(float, list_))
+            except:
+                return None, list_
+                '''
+                print(list_)
+                raise TypeError('invaild value in the str_')
+                '''
+            else:return list_1
 
-def IQR_Outliers(list_:list, range_ = [0.25,0.75]):
-        df_ = pd.DataFrame(list_)
-        Q1_ = df_.quantile(range_[0])
-        Q3_ = df_.quantile(range_[1])
-        IQR_ = Q3_ - Q1_
-        return list(df_[~((df_ < (Q1_ - 1.5*IQR_))|(df_>(Q3_ + 1.5*IQR_))).any(axis=1)])
+def IQR_Outliers(list_:list, range_ = [0.25,0.75]) -> list:
+    '''对传入的列表做IQR异常值处理
+
+    Args:
+        list_ (list): 传入的列表
+        range_ (list, optional): 异常值上下threshold. Defaults to [0.25,0.75].
+
+    Returns:
+        list: 异常值处理后的数组
+    '''
+    df_ = pd.DataFrame(list_)
+    Q1_ = df_.quantile(range_[0])
+    Q3_ = df_.quantile(range_[1])
+    IQR_ = Q3_ - Q1_
+    return list(df_[~((df_ < (Q1_ - 1.5*IQR_))|(df_>(Q3_ + 1.5*IQR_))).any(axis=1)])
 
 class SliceDoc():
+    '''SliceDoc类
+    * 是基本数据类型
+    * 用于存储说明性质的数据
+    * 不具有计算功能
+    '''
     def __init__(self, key_:any, value_:any) -> None:
         self.__key = key_
         self.__value = value_
@@ -124,11 +179,23 @@ class SliceDoc():
         self.__value = value_
 
 class SliceCal():
+    '''SliceCal类
+    * 是基本类型
+    * 用于存储具体的数值型数据
+    * 提供计算方法
+    '''
     def __init__(self, key_:any, value_:list, describe_ = '', correct_ = False) -> None:
-        self.__key = key_
-        if correct_: self.__value = IQR_Outliers(value_)
-        else: self.__value = value_
+        '''SliceCal类构造函数
 
+        Args:
+            key_ (any): 当前slicecal对象所描述的数据名称,最好为str
+            value_ (list): 当前slicecal对象所存储的具体的数据
+            describe_ (str, optional): 使用者对当前数据的描述. Defaults to ''.
+            correct_ (bool, optional): 是否对数据进行IQR异常值处理,当数据值较少时不建议使用. Defaults to False.
+        '''
+        self.__key = key_
+        if correct_:    self.__value = IQR_Outliers(value_)
+        else:           self.__value = value_
         value_ = np.array(value_)
         self.__describe = {
             'min':value_.min(),
@@ -137,6 +204,7 @@ class SliceCal():
             'std':value_.std(),
             'var':value_.var()
         }
+        del value_
     #   key管理方法，暂时不需要删除key
     @property
     def key(self):
@@ -160,6 +228,7 @@ class SliceCal():
             'std':value_.std(),
             'var':value_.var()
         }
+        del value_
     #   describe管理，不提供方法修改describe
     @property
     def describe(self):
@@ -167,6 +236,14 @@ class SliceCal():
     #   用于将matx对象中存储的slice对象地址dereference为具体的slice值，默认以dict形式返回
     @property
     def de_reference(self, mode = dict):
+        '''用于将matx对象中存储的slice对象引用(地址)dereference为具体的slice值,默认以dict形式返回
+
+        Args:
+            mode (typr, optional): 返回值的类型:dict or list. Defaults to dict.
+
+        Returns:
+            _type_: 返回当前slice对象中的key value describe值
+        '''
         if mode == dict:
             return {
                 'key':self.key, 
@@ -176,38 +253,40 @@ class SliceCal():
         return [self.key, self.value, self.describe]
 
 class Matx():
-    __slices = {}
-    __type_of_key = None
     #   只接受此构造函数
-    def __init__(self, index_:any, data_:dict) -> dict:
-        for key,value in data_.items():
-            #   如果value为单纯数字，则代表此slice为最简单的描述性数字，直接基于此添加一个slice对象即可
+    def __init__(self, index_:any, data_:dict):
+        '''Matx的构造函数
+
+        Args:
+            index_ (any): 本matx对象的index,一般为该组数据的工况号,如'第x组试验'或'x'(x:int)
+            data_ (dict): 本matx对象的具体数据,其内部的键值对用于生成matx内部存储的__slices
+        '''
+        self.__slices = {}  #   用于存储slices对象
+        self.__type_of_key = None   #   存储slices对象key的类型
+        for key,value in data_.items(): #   迭代传入的dict
+            #   如果value为单纯数字，则代表此slice为最简单的描述性数字，直接基于此添加一个slicedoc对象即可
             if type(value) == int or type(value) == float:
-                self.__slices[key] = copy.deepcopy(SliceDoc(key, value))
-            #   如果value为str，则代表此slice可能为描述性说明数据，更大可能是以str存储的list
+                self.__slices[key] = SliceDoc(key, value)
+            #   如果value为str，则代表此slice可能是描述性语句(docstring), 也可能是str形式存储的list
             elif type(value) == str:
-                if key == 'docstring':# 如果这个key是docstring，便不执行cutstr2list，直接创建一个slicedoc对象
+                if key == 'docstring':  #   此value的key为docstring,则直接创建一个slicedoc对象
                     self.__slices[key] = SliceDoc(key, value)
-                else:
+                else:   #   此value为正常数字型数据
                     value_ = cut_str_list_2_num_list(value)
-                    if value_ is None:
-                        self.__slices[key] = SliceDoc(key, value_)
-                    else:
+                    if value_:  #   当字符串切割并生成列表失败,则直接退出程序
+                        log('Failed to Cut Str' + str(index_) + str(key), 0)
+                    else:   #   字符串切割并生成列表成功
                         self.__slices[key] = SliceDoc(key, value_)
             #   如果value为dict，则代表此slice其实是matx对象，直接添加一个matx对象到slice中即可
             elif type(value) == dict:
-                self.__slices[key] = copy.deepcopy(Matx(key, value))
+                self.__slices[key] = Matx(key, value)
         self.__key = list(data_.keys())
         self.__type_of_key = type(self.__key[0])
         self.__value = list(data_.values())
         self.__index = index_
-        self.__data = data_
     @property
     def index(self):
         return self.__index
-    @property
-    def data(self):
-        return self.__data
     @property
     def key(self):
         return self.__key
@@ -227,16 +306,10 @@ class Matx():
             slices_.append(i.DeReference)
         return slices_'''
 
-
-
 class Dataer:
-    __keys = []
-    __values = []
-    __docstring = ''
-    __type_of_key = None
-    __matxes = {}
     #   原始初始化函数，传入字典
     def __init__(self, data_:dict, docstring_ = 'original data from given Dict data') -> Type[dict]:
+        self.__matxes = {}
         self.__keys = list(data_.keys())
         self.__type_of_key = type(self.__keys[0])
         self.__values = list(data_.values())
@@ -246,8 +319,7 @@ class Dataer:
                 if key != 'docstring':
                     raise TypeError('Wrong data')
             else:
-                t = Matx(key, value)
-                self.__matxes[key] = t #   深拷贝
+                self.__matxes[key] = Matx(key, value)
     #   重构构造函数，通过传入yml数据文件的地址来读取数据
     @classmethod
     def load_yml(cls, filepath:str, docstring_ = 'original data from given YML file'):
@@ -353,7 +425,6 @@ class Dataer:
                 for j in items[0:-1]:   #   对item（即具体需要获取的数据的keys）遍历  
                     tmp_res_ = tmp_res_.slices[j]   #   仅拿出silice
                     res_key_ += str(j) + '-'       
-                print(tmp_res_.__class__, tmp_res_.value)
                 res_[res_key_ + items[-1]] = tmp_res_.slices[items[-1]].value #   具体的值在最后拿出
             return res_
 
@@ -376,9 +447,12 @@ def slice_t_test(slcie1_:SliceCal, slice2_:SliceCal):
 
 
 if __name__ == '__main__':
-    data = Dataer.load_yml('./results.yml')
-    a = data.get_specific_slices(None, 'stdmaxtime', 'left')
+    data = Dataer.load_yml('./res.yml')
+    a = data.get_specific_slices([1,2,3], 'endpos')
     print(a)
+    b = Matx('test', {
+        1:[1,2,3,4],
+        2:[5,6,7,8]
+    })
+    print(b.__class__)
 
-
-#   列表传输，lista = listb 
