@@ -156,6 +156,81 @@ def IQR_Outliers(list_:list, range_ = [0.25,0.75]) -> list:
     IQR_ = Q3_ - Q1_
     return list(df_[~((df_ < (Q1_ - 1.5*IQR_))|(df_>(Q3_ + 1.5*IQR_))).any(axis=1)])
 
+def get_first_nan(list_:list):
+    '''在提供的list中找出第一个nan值的index
+    * 适用于list中存在的nan列为整块 如[1,1,1,1,nan,nan,nan,nan,nan]
+    * 主要用于获取给定时间序列中的最大疏散时间
+        * 主要用于找出给定时间列表中的第一个nan值index 第一个nan值的前一个数据即为最后一个有效时间数据
+    * 判断依据: nan != nan
+    Args:
+        list_ (list): 给定的数据list
+
+    Returns:
+        float: 给定数据list中的第一个nan值的index
+        None: 给定数据中不存在nan值
+    '''
+    half_l_ = int(len(list_)/2)
+    if list_[half_l_] != list_[half_l_]:
+        list_ = list_[0:half_l_+1]
+        for i in range(len(list_)):
+            if list_[i] != list_[i]:
+                return i
+    else:
+        list_ = list_[half_l_::]
+        for i in range(len(list_)):
+            if list_[i] != list_[i]:
+                return i + half_l_
+    return None
+
+def get_starttime(list_:list, item_ = 0):
+    '''获取给定list中的元素开始变化的index
+    * 适用于list中开头元素为长段的定值 如[0,0,0,1,2,3,4]
+    * 主要用于获取给定坐标㤡中坐标开始变化的行
+        * 该行主要用于获取对应时间序列中同一位置的时间值
+        * 即获取开始运动的时间
+    Args:
+        list_ (list): 输入待检索的数据list
+
+    Returns:
+        index(float): 给定元素第一次出现的index
+    '''
+
+    if len(list_) == 0:
+        log('Input List is Empty', 0)
+        return None
+    else:
+        for i in range(len(list_)):
+            if list_[i] != item_:
+                return i
+
+def FixData(origin_data:pd.DataFrame, correct_columns: int, *axis):
+    '''fix the given data in case this data has empty columns or descirpion information at the header
+
+    Args:
+        origin_data (pd.DataFrame): the origin data readed from the xlsx
+        correct_columns (int): the correctly number of columns
+
+    Returns:
+        fix_info (dict): a dict contains the fix information, and this would be used as origin the yml input
+    '''
+    fix_info = {}
+    rows, columns = origin_data.shape
+    print(origin_data.index)
+    reindex = 1
+    # row correct
+    if origin_data.iloc[0][0] != 0.1: # 如果第一行一个元素不是数字0.1，则进行校正
+            origin_data = origin_data.drop([0]) # 删除第一行
+            fix_info['Row Correct'] = 'True' # 将是否校正第一行添加到valu
+            reindex = 0
+    if columns == correct_columns:
+        pass
+    else:
+        origin_data = origin_data.dropna(axis=1, how='all')
+        fix_info['Column Correct'] = 'True' # 将是否校正第一行添加到valu
+    print(origin_data.index)
+    return origin_data, fix_info, reindex
+
+
 class SliceDoc():
     '''SliceDoc类
     * 是基本数据类型
@@ -274,9 +349,9 @@ class Matx():
                 else:   #   此value为正常数字型数据
                     value_ = cut_str_list_2_num_list(value)
                     if value_:  #   当字符串切割并生成列表失败,则直接退出程序
-                        log('Failed to Cut Str' + str(index_) + str(key), 0)
-                    else:   #   字符串切割并生成列表成功
                         self.__slices[key] = SliceDoc(key, value_)
+                    else:   #   字符串切割并生成列表成功
+                        log('Failed to Cut Str:' + str(index_) + str(key), 0)
             #   如果value为dict，则代表此slice其实是matx对象，直接添加一个matx对象到slice中即可
             elif type(value) == dict:
                 self.__slices[key] = Matx(key, value)
@@ -309,9 +384,9 @@ class Matx():
 class Dataer:
     #   原始初始化函数，传入字典
     def __init__(self, data_:dict, docstring_ = 'original data from given Dict data') -> Type[dict]:
+        self.__index = list(data_.keys())
         self.__matxes = {}
-        self.__keys = list(data_.keys())
-        self.__type_of_key = type(self.__keys[0])
+        self.__type_of_key = type(self.__index[0])
         self.__values = list(data_.values())
         self.__docstring = docstring_
         for key, value in data_.items():
@@ -331,8 +406,8 @@ class Dataer:
         else:
             raise FileNotFoundError("File Doesn't exist")
     @property
-    def keys(self):
-        return self.__keys
+    def index(self):
+        return self.__index
     
     def drop_key_value(self, key_:any):
         flag_, key_ = self.find_key(key_)
@@ -350,15 +425,24 @@ class Dataer:
                 raise ValueError('Wrong Input Key Type: ' + type(key_) + ', the Correct Type is ' + str(self.type_of_key))
             else:  #    转换成功
                 log(str('Should Use Right Key Type: ' + str(self.type_of_key)), color=2)
-                try:    self.keys.index(key_convert_)#   尝试定位
-                except: return False, None#   并未找到，返回false,none
+                try:    self.__index.index(key_convert_)#   尝试定位
+                except: return False, key_#   并未找到，返回false,错误的输入key
                 else:   return True, key_convert_#  找到，返回true,keys中准确的key
         else:
-            try: self.keys.index(key_)#   尝试定位
-            except: return False, None#   并未找到，返回false
-            else: return True, key_#  找到，返回true
+            try:    self.__index.index(key_)#   尝试定位
+            except: return False, key_#   并未找到，返回false
+            else:   return True, key_#  找到，返回true
 
     def check_keys(self, keys_:list):
+        '''传入一个matx的index列表 检查其中的index是否存在
+
+        Args:
+            keys_ (list): 待查询的index列表
+
+        Returns:
+            true, cor_index: 所有index都存在时 返回true以及矫正后的index列表
+            false, wrong_index: 有一个index不存在便会false 以及所有不存在的index列表 
+        '''
         #   如果输入的list为空，则警告，返回None
         if len(keys_) == 0:
             log('Should Not Input Empty', 0)
@@ -366,16 +450,16 @@ class Dataer:
         else:
             overall_flag_ = True    #   总的check结果，全部存在则为true，其余情况为false
             wrong_keys_ = []    #   错误的keylist
-            cor_keys = []   #   findkey修正的keylist'
+            cor_keys_ = []   #   findkey修正的keylist'
             for i in keys_:
                 flag_, key_ = self.find_key(i)  #   查找输入 keylist中的key
-                cor_keys.append(key_)
-                if flag_ :pass
-                else:
-                    overall_flag_ == False
-                    wrong_keys_.append([i, key_])
-            if overall_flag_:return overall_flag_, cor_keys
-            else:return overall_flag_, wrong_keys_
+                if flag_ :  #   key存在
+                    cor_keys_.append(key_)   #   cor_keys_
+                else:   #   key不存在
+                    overall_flag_ = False  #   标记存在一个不存在的key
+                    wrong_keys_.append(i)
+            if overall_flag_:   return True, cor_keys_
+            else:               return False, wrong_keys_
     #   将values property化
     @property
     def values(self):
@@ -391,7 +475,7 @@ class Dataer:
         keyErrorFlag = False
         notFoundKeyList = []
         for key in drop_keys_list:
-            if key not in self.__keys:
+            if key not in self.__index:
                 notFoundKeyList.append(key)
         if keyErrorFlag:
             raise KeyError('Error Key Found:' + notFoundKeyList+', Not Found in The Dataer Keys')
@@ -410,24 +494,30 @@ class Dataer:
         else:
             #   如果不指定具体的indexofmatx，则代表将遍历所有matx
             if index_of_matxs is None:
-                index_of_matxs = self.keys
+                index_of_matxs = self.__index
                 log('Iterate All Matxs in the Data',  2)
             #   1 检查indexofmatxs内的index类型是否匹配
             flag_, cor_keys = self.check_keys((index_of_matxs))
             #   如果查找结果为True，则代表输入的key全部存在
-            if flag_:   log('Input Keys all exist', 1)
-            else:       log('Keys:' + str(cor_keys) + 'dont exist', 0)
+            if flag_:  
+                log('Input Matx Indexes all exist', 1)
+            else:       
+                log('Indexes::' + str(cor_keys) + 'dont exist', 0)
+                quit()
             #   2 递归找出item中指向的slice
             res_ = {}   #   以字典的形式存储所找到的slice，其key为matx_key-items
+            print('cor_key_: ' + str(cor_keys))
+            res_keys_ = ''
+            for i in items[0:-1]:
+                res_keys_ += i + '-'
+            res_keys_ += items[-1]
             for i in cor_keys:
-                res_key_ = str(i) + '-'  #   将index str化
                 tmp_res_ = self.matxes[i]   #   获取到每一个matx
                 for j in items[0:-1]:   #   对item（即具体需要获取的数据的keys）遍历  
-                    tmp_res_ = tmp_res_.slices[j]   #   仅拿出silice
-                    res_key_ += str(j) + '-'       
-                res_[res_key_ + items[-1]] = tmp_res_.slices[items[-1]].value #   具体的值在最后拿出
+                    tmp_res_ = tmp_res_.slices[j]   #   仅拿出silice       
+                res_[i] = tmp_res_.slices[items[-1]].value #   具体的值在最后拿出
+            res_['docstring'] = res_keys_
             return res_
-
 
 def slice_t_test(slcie1_:SliceCal, slice2_:SliceCal):
     log('T Test', color=1)
@@ -444,15 +534,8 @@ def slice_t_test(slcie1_:SliceCal, slice2_:SliceCal):
         log('方差不等')
         print(stats.ttest_ind(value1_,value2_,equal_var=False))
 
-
-
 if __name__ == '__main__':
-    data = Dataer.load_yml('./res.yml')
-    a = data.get_specific_slices([1,2,3], 'endpos')
-    print(a)
-    b = Matx('test', {
-        1:[1,2,3,4],
-        2:[5,6,7,8]
-    })
-    print(b.__class__)
-
+    '''data = Dataer.load_yml('./results.yml')
+    a = data.get_specific_slices([1,10], 'endpos')
+    print(data.matxes)'''
+    print(get_first_nan([1,2,3,3,4,5,6,7]))
