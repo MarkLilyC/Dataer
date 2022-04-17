@@ -154,6 +154,8 @@ def IQR_Outliers(list_:list, range_ = [0.25,0.75]) -> list:
     Q1_ = df_.quantile(range_[0])
     Q3_ = df_.quantile(range_[1])
     IQR_ = Q3_ - Q1_
+    res_ = list(df_[~((df_ < (Q1_ - 1.5*IQR_))|(df_>(Q3_ + 1.5*IQR_))).any(axis=1)])
+    log('Removed ' + str(len(list_) - len(res_)) + ' items, ' + str(len(list_)) + '-' + str(len(res_)))
     return list(df_[~((df_ < (Q1_ - 1.5*IQR_))|(df_>(Q3_ + 1.5*IQR_))).any(axis=1)])
 
 def get_first_nan(list_:list):
