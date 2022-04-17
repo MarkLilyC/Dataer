@@ -1,3 +1,4 @@
+from cmath import nan
 import copy
 from operator import index, indexOf
 import os
@@ -140,7 +141,7 @@ def cut_str_list_2_num_list(str_:str, cut_flag_ = ',') -> list:
                 '''
             else:return list_1
 
-def IQR_Outliers(list_:list, range_ = [0.25,0.75]) -> list:
+def IQR_Outliers(list_:list, range_ = [0.25,0.75], fill = False) -> list:
     '''对传入的列表做IQR异常值处理
 
     Args:
@@ -155,8 +156,14 @@ def IQR_Outliers(list_:list, range_ = [0.25,0.75]) -> list:
     Q3_ = df_.quantile(range_[1])
     IQR_ = Q3_ - Q1_
     res_ = list(df_[~((df_ < (Q1_ - 1.5*IQR_))|(df_>(Q3_ + 1.5*IQR_))).any(axis=1)])
-    log('Removed ' + str(len(list_) - len(res_)) + ' items, ' + str(len(list_)) + '-' + str(len(res_)))
-    return list(df_[~((df_ < (Q1_ - 1.5*IQR_))|(df_>(Q3_ + 1.5*IQR_))).any(axis=1)])
+    remove_num_ = len(list_) - len(res_)
+    log('Removed ' + str(remove_num_) + ' items, ' + str(len(list_)) + '-' + str(len(res_)))
+    if fill:
+        for i in range(remove_num_):
+            res_.append(nan)
+        return res_
+    else:
+        return res_
 
 def get_first_nan(list_:list):
     '''在提供的list中找出第一个nan值的index
@@ -518,7 +525,7 @@ class Dataer:
                 for j in items[0:-1]:   #   对item（即具体需要获取的数据的keys）遍历  
                     tmp_res_ = tmp_res_.slices[j]   #   仅拿出silice       
                 res_[i] = tmp_res_.slices[items[-1]].value #   具体的值在最后拿出
-            res_['docstring'] = res_keys_
+            # res_['docstring'] = res_keys_
             return res_
 
 def slice_t_test(slcie1_:SliceCal, slice2_:SliceCal):
@@ -537,7 +544,6 @@ def slice_t_test(slcie1_:SliceCal, slice2_:SliceCal):
         print(stats.ttest_ind(value1_,value2_,equal_var=False))
 
 if __name__ == '__main__':
-    '''data = Dataer.load_yml('./results.yml')
-    a = data.get_specific_slices([1,10], 'endpos')
-    print(data.matxes)'''
-    print(get_first_nan([1,2,3,3,4,5,6,7]))
+    data = Dataer.load_yml('./results.yml')
+    a = data.get_specific_slices([1], 'starttime', 'total')
+    
